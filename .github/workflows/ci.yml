@@ -35,6 +35,7 @@ on:
     - 'scripts/load-smoke.sh'
     - 'tz/**'
 
+
 # Отменяем предыдущие незавершённые прогоны в том же репозитории/ветке.
 concurrency:
   group: ci-${{ github.repository }}-${{ github.ref }}
