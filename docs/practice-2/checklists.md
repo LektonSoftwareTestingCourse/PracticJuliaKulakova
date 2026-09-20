@@ -65,7 +65,7 @@
 - [ ] Превышение дневного лимита → `61`, `EXCEEDS_AMOUNT_LIMIT` (сценарий `declines_test`)
 - [ ] Превышение месячного лимита → `61`, `EXCEEDS_AMOUNT_LIMIT`
 - [ ] Недостаточно средств → `51`, `INSUFFICIENT_FUNDS`
-- [ ] Card Management недоступен → `96`, `SERVICE_UNAVAILABLE` (после возврата сервиса система
+- [ ] Card Management недоступен → отказ (ТЗ: `05`, `ISSUER_TIMEOUT`; реализация: `96`, `SERVICE_UNAVAILABLE`) (после возврата сервиса система
   работает без перезапуска)
 - [ ] Отклонённая транзакция не изменяет ни `availableBalance`, ни `limit_usage`
 - [ ] Каждый decline-код виден в `GET /api/transactions/search` по фильтру `declineReason`
@@ -88,3 +88,7 @@
 - [ ] Пагинация карт и транзакций не теряет и не дублирует записи
 - [ ] Карты со статусом `DELETED` не возвращаются ни в `GET /api/cards`, ни в `GET /api/cards/{pan}`
 - [ ] Данные Dashboard совпадают с `GET /api/dashboard/stats` и результатами поиска в Logger
+- [ ] Повторный `reserve` с уже использованным `rrn` → `409`, `availableBalance` не изменяется
+- [ ] `rollback` по `rrn` возвращает средства на карту, повторный `rollback` с тем же `rrn` → `409`
+- [ ] `POST /api/cards/bulk-update` меняет статус только карт с переданными `bins`/`pans` и возвращает корректный `updated`
+- [ ] Справочник `/api/bins` известный BIN отдаёт `issuerId`, повторное создание BIN → `409`, неизвестный BIN → `404`
