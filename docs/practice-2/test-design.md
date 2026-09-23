@@ -56,10 +56,10 @@
 
 ### Card Management Service
 
-| Поле               | Граница          | ON                        | OFF                           | Ожидаемый результат                                                       |
-|--------------------|------------------|---------------------------|-------------------------------|---------------------------------------------------------------------------|
-| amount (reserve)   | availableBalance | amount = availableBalance | amount = availableBalance + 1 | ON: 200 OK, баланс = 0; OFF: 400 Bad Request, reason="INSUFFICIENT_FUNDS" |
-| amount (reserve)   | 0                | 0                         | 1                             | ON: 400 Bad Request, reason="INVALID_AMOUNT"; OFF: 200 OK                 |
+| Поле               | Граница            | ON                        | OFF                           | Ожидаемый результат                                                       |
+|--------------------|--------------------|---------------------------|-------------------------------|---------------------------------------------------------------------------|
+| amount (reserve)   | availableBalance   | amount = availableBalance | amount = availableBalance + 1 | ON: 200 OK, баланс = 0; OFF: 400 Bad Request, reason="INSUFFICIENT_FUNDS" |
+| amount (reserve)   | минимальная сумма  | 1                         | 0                             | ON: 200 OK  ; OFF: 400 Bad Request, reason="INVALID_AMOUNT"               |
 
 ---
 
@@ -109,33 +109,33 @@
 
 #### Тест-кейсы на классы эквивалентности
 
-| ID | Требование                 | Источник                       | Предусловие                    | Шаги                                                      | Ожидаемый результат                                         |
-|----|----------------------------|--------------------------------|--------------------------------|-----------------------------------------------------------|-------------------------------------------------------------|
-| CM-CE-001 | Создание карты             | Класс: operation=create        | Сервис запущен, БД доступна    | 1. POST /api/cards с bin=400000, initialBalance=1000000   | 200 OK, карта создана с status=ACTIVE, PAN валидный по Luhn |
-| CM-CE-002 | Чтение карты               | Класс: operation=read          | Карта ACTIVE создана           | 1. GET /api/cards/{pan}                                   | 200 OK, карта возвращена                                    |
-| CM-CE-003 | Обновление карты           | Класс: operation=update        | Карта ACTIVE создана           | 1. PATCH /api/cards/{pan} с новым балансом                | 200 OK, баланс обновлён                                     |
-| CM-CE-004 | Удаление карты             | Класс: operation=delete        | Карта ACTIVE создана           | 1. DELETE /api/cards/{pan}                                | 200 OK, статус карты = DELETED                              |
-| CM-CE-005 | Резервирование средств     | Класс: operation=reserve       | Карта ACTIVE с балансом 100000 | 1. POST /api/cards/{pan}/reserve с amount=50000           | 200 OK, баланс уменьшен до 50000                            |
-| CM-CE-006 | Генерация карт             | Класс: operation=generate      | Сервис запущен                 | 1. POST /api/cards/generate с count=100, bins=["400000"]  | 200 OK, 100 карт созданы, статусы распределены 95/3/2       |
-| CM-CE-007 | Карта со статусом ACTIVE   | Класс: card_status=ACTIVE      | Карта ACTIVE создана           | 1. GET /api/cards/{pan}                                   | 200 OK, статус ACTIVE                                       |
-| CM-CE-008 | Карта со статусом INACTIVE | Класс: card_status=INACTIVE    | Карта INACTIVE создана         | 1. GET /api/cards/{pan}                                   | 200 OK, статус INACTIVE                                     |
-| CM-CE-009 | Карта со статусом BLOCKED  | Класс: card_status=BLOCKED     | Карта BLOCKED создана          | 1. GET /api/cards/{pan}                                   | 200 OK, статус BLOCKED                                      |
-| CM-CE-010 | Карта со статусом EXPIRED  | Класс: card_status=EXPIRED     | Карта EXPIRED создана          | 1. GET /api/cards/{pan}                                   | 200 OK, статус EXPIRED                                      |
-| CM-CE-011 | Валидный PAN по Luhn       | Класс: pan_format=valid_luhn   | Сервис запущен                 | 1. POST /api/cards с bin=400000                           | 200 OK, PAN проходит проверку Luhn                          |
-| CM-CE-012 | Невалидный PAN по Luhn     | Класс: pan_format=invalid_luhn | Сервис запущен                 | 1. POST /api/cards с PAN, не проходящим Luhn              | 400 Bad Request, reason="INVALID_LUHN"                      |
-| CM-CE-013 | Валидный срок действия     | Класс: expiry=valid_future     | Сервис запущен                 | 1. POST /api/cards с expiryDate через 3 года              | 200 OK, карта создана                                       |
-| CM-CE-014 | Просроченный срок действия | Класс: expiry=expired          | Сервис запущен                 | 1. POST /api/cards с expiryDate в прошлом                 | 400 Bad Request, reason="EXPIRED_DATE"                      |
-| CM-CE-015 | Валидный BIN               | Класс: bin=valid_400000        | Сервис запущен                 | 1. POST /api/cards с bin=400000                           | 200 OK, PAN начинается с 400000                             |
-| CM-CE-016 | Невалидный BIN             | Класс: bin=invalid_999999      | Сервис запущен                 | 1. POST /api/cards с bin=999999                           | 400 Bad Request, reason="INVALID_BIN"                       |
+| ID          | Требование                 | Источник                       | Предусловие                    | Шаги                                                      | Ожидаемый результат                                         |
+|-------------|----------------------------|--------------------------------|--------------------------------|-----------------------------------------------------------|-------------------------------------------------------------|
+| CM-CE-001 с | Создание карты             | Класс: operation=create        | Сервис запущен, БД доступна    | 1. POST /api/cards с bin=400000, initialBalance=1000000   | 200 OK, карта создана с status=ACTIVE, PAN валидный по Luhn |
+| CM-CE-002   | Чтение карты               | Класс: operation=read          | Карта ACTIVE создана           | 1. GET /api/cards/{pan}                                   | 200 OK, карта возвращена                                    |
+| CM-CE-003   | Обновление карты           | Класс: operation=update        | Карта ACTIVE создана           | 1. PATCH /api/cards/{pan} с новым балансом                | 200 OK, баланс обновлён                                     |
+| CM-CE-004   | Удаление карты             | Класс: operation=delete        | Карта ACTIVE создана           | 1. DELETE /api/cards/{pan}                                | 200 OK, статус карты = DELETED                              |
+| CM-CE-005   | Резервирование средств     | Класс: operation=reserve       | Карта ACTIVE с балансом 100000 | 1. POST /api/cards/{pan}/reserve с amount=50000           | 200 OK, баланс уменьшен до 50000                            |
+| CM-CE-006   | Генерация карт             | Класс: operation=generate      | Сервис запущен                 | 1. POST /api/cards/generate с count=100, bins=["400000"]  | 200 OK, 100 карт созданы, статусы распределены 95/3/2       |
+| CM-CE-007   | Карта со статусом ACTIVE   | Класс: card_status=ACTIVE      | Карта ACTIVE создана           | 1. GET /api/cards/{pan}                                   | 200 OK, статус ACTIVE                                       |
+| CM-CE-008   | Карта со статусом INACTIVE | Класс: card_status=INACTIVE    | Карта INACTIVE создана         | 1. GET /api/cards/{pan}                                   | 200 OK, статус INACTIVE                                     |
+| CM-CE-009   | Карта со статусом BLOCKED  | Класс: card_status=BLOCKED     | Карта BLOCKED создана          | 1. GET /api/cards/{pan}                                   | 200 OK, статус BLOCKED                                      |
+| CM-CE-010   | Карта со статусом EXPIRED  | Класс: card_status=EXPIRED     | Карта EXPIRED создана          | 1. GET /api/cards/{pan}                                   | 200 OK, статус EXPIRED                                      |
+| CM-CE-011   | Валидный PAN по Luhn       | Класс: pan_format=valid_luhn   | Сервис запущен                 | 1. POST /api/cards с bin=400000                           | 200 OK, PAN проходит проверку Luhn                          |
+| CM-CE-012   | Невалидный PAN по Luhn     | Класс: pan_format=invalid_luhn | Сервис запущен                 | 1. POST /api/cards с PAN, не проходящим Luhn              | 400 Bad Request, reason="INVALID_LUHN"                      |
+| CM-CE-013   | Валидный срок действия     | Класс: expiry=valid_future     | Сервис запущен                 | 1. POST /api/cards с expiryDate через 3 года              | 200 OK, карта создана                                       |
+| CM-CE-014   | Просроченный срок действия | Класс: expiry=expired          | Сервис запущен                 | 1. POST /api/cards с expiryDate в прошлом                 | 400 Bad Request, reason="EXPIRED_DATE"                      |
+| CM-CE-015   | Валидный BIN               | Класс: bin=valid_400000        | Сервис запущен                 | 1. POST /api/cards с bin=400000                           | 200 OK, PAN начинается с 400000                             |
+| CM-CE-016   | Невалидный BIN             | Класс: bin=invalid_999999      | Сервис запущен                 | 1. POST /api/cards с bin=999999                           | 400 Bad Request, reason="INVALID_BIN"                       |
 
 #### Тест-кейсы на граничные значения
 
-| ID | Требование              | Источник                               | Предусловие                      | Шаги                                               | Ожидаемый результат                          |
-|----|-------------------------|----------------------------------------|----------------------------------|----------------------------------------------------|----------------------------------------------|
-| CM-BV-001 | amount равен балансу    | Граница: amount=availableBalance ON    | Карта ACTIVE с балансом 100000   | 1. POST /api/cards/{pan}/reserve с amount=100000   | 200 OK, баланс = 0                           |
-| CM-BV-002 | amount превышает баланс | Граница: amount=availableBalance+1 OFF | Карта ACTIVE с балансом 100000   | 1. POST /api/cards/{pan}/reserve с amount=100001   | 400 Bad Request, reason="INSUFFICIENT_FUNDS" |
-| CM-BV-003 | amount равен нулю       | Граница: amount=0 ON                   | Карта ACTIVE с балансом 100000   | 1. POST /api/cards/{pan}/reserve с amount=0        | 400 Bad Request, reason="INVALID_AMOUNT"     |
-| CM-BV-004 | amount равен 1          | Граница: amount=1 OFF                  | Карта ACTIVE с балансом 100000   | 1. POST /api/cards/{pan}/reserve с amount=1        | 200 OK, баланс = 99999                       |
+| ID          | Требование                       | Источник                               | Предусловие                     | Шаги                                               | Ожидаемый результат                          |
+|-------------|----------------------------------|----------------------------------------|---------------------------------|----------------------------------------------------|----------------------------------------------|
+| CM-BV-001   | amount равен балансу             | Граница: amount=availableBalance ON    | Карта ACTIVE с балансом 100000  | 1. POST /api/cards/{pan}/reserve с amount=100000   | 200 OK, баланс = 0                           |
+| CM-BV-002   | amount превышает баланс          | Граница: amount=availableBalance+1 OFF | Карта ACTIVE с балансом 100000  | 1. POST /api/cards/{pan}/reserve с amount=100001   | 400 Bad Request, reason="INSUFFICIENT_FUNDS" |
+| CM-BV-003   | amount равен нулю (невалидное)   | Граница: amount=0 OFF                  | Карта ACTIVE с балансом 100000  | 1. POST /api/cards/{pan}/reserve с amount=0        | 400 Bad Request, reason="INVALID_AMOUNT"     |
+| CM-BV-004   | amount равен 1 (мин. допустимое) | Граница: amount=1 ON                   | Карта ACTIVE с балансом 100000  | 1. POST /api/cards/{pan}/reserve с amount=1        | 200 OK, баланс = 99999                       |
 
 #### Тест-кейсы из попарного набора (pairwise)
 
