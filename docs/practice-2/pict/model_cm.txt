@@ -1,12 +1,9 @@
-# Card Management Service
-
 operation:      create, read, update, delete, reserve, generate
 card_status:    ACTIVE, INACTIVE, BLOCKED, EXPIRED
 pan_format:     valid_luhn, invalid_luhn
 expiry:         valid_future, expired
 bin:            valid_400000, invalid_999999
 amount:         within_balance, exceeds_balance, zero
-daily_limit:    valid_range, below_minimum, above_maximum
 
 # Constraints
 IF [operation] = "reserve" THEN [card_status] = "ACTIVE";
