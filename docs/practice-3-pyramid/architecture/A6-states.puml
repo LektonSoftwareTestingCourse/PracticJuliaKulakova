@@ -1,0 +1,117 @@
+@startuml A6_State_Machines
+
+title A6. Жизненный цикл карты, транзакции и резерва
+
+top to bottom direction
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ArrowColor #81758F
+skinparam StateBorderColor #B8AFC8
+skinparam StateFontColor #40364F
+skinparam ArrowThickness 1.2
+skinparam BackgroundColor white
+
+skinparam state {
+    BackgroundColor #E9DFF5
+    BorderColor #B8AFC8
+    FontColor #40364F
+}
+
+skinparam note {
+    BackgroundColor #FFF8E7
+    BorderColor #B8AFC8
+    FontColor #40364F
+}
+
+state "1. Card.status" as CARD {
+
+    state "ACTIVE" as C_ACTIVE #E9DFF5
+    state "INACTIVE" as C_INACTIVE #DCE9F8
+    state "BLOCKED" as C_BLOCKED #F4DDE5
+    state "EXPIRED" as C_EXPIRED #F4DDE5
+    state "DELETED" as C_DELETED #F2F0F5
+
+    [*] --> C_ACTIVE : create / 95%
+    [*] --> C_INACTIVE : generate / 3%
+    [*] --> C_BLOCKED : generate / 2%
+
+    C_ACTIVE --> C_INACTIVE : set INACTIVE
+    C_INACTIVE --> C_ACTIVE : set ACTIVE
+    C_ACTIVE --> C_BLOCKED : set BLOCKED
+    C_BLOCKED --> C_ACTIVE : unblock
+    C_ACTIVE --> C_EXPIRED : set EXPIRED
+
+    C_ACTIVE --> C_DELETED : DELETE
+    C_INACTIVE --> C_DELETED : DELETE
+    C_BLOCKED --> C_DELETED : DELETE
+    C_EXPIRED --> C_DELETED : DELETE
+
+    C_DELETED --> [*]
+
+    --
+
+    note as CARD_NOTE
+      Авторизация проверяет срок действия,
+      баланс и лимиты.
+      Истечение expiryDate само по себе
+      не меняет status автоматически.
+
+      BLOCKED / INACTIVE → code 05
+      EXPIRED → code 54
+      Карта не найдена → code 14
+    end note
+}
+
+state "2. TransactionStatus" as TX {
+
+    state "APPROVED\ncode 00" as T_APPROVED #E9DFF5
+    state "DECLINED" as T_DECLINED #F4DDE5
+
+    [*] --> T_APPROVED : авторизация успешна
+    [*] --> T_DECLINED : отказ авторизации
+    [*] --> T_DECLINED : ошибка публикации\nпосле резерва / code 96
+
+    T_APPROVED --> [*] : ответ клиенту
+    T_DECLINED --> [*] : ответ клиенту
+
+    --
+
+    note as TX_NOTE
+      Возможные коды отказа:
+      05, 14, 51, 54, 61, 96.
+
+      Logger работает асинхронно.
+      Switch не ожидает publisher-confirm.
+    end note
+}
+
+state "3. ReservationStatus" as RES {
+
+    state "RESERVED" as R_RESERVED #E9DFF5
+    state "ROLLED_BACK" as R_ROLLED_BACK #F4DDE5
+
+    [*] --> R_RESERVED : reserve
+
+    R_RESERVED --> [*] : транзакция APPROVED
+    R_RESERVED --> R_ROLLED_BACK : rollback / code 96
+
+    R_ROLLED_BACK --> [*]
+    R_ROLLED_BACK --> R_ROLLED_BACK : повторный rollback
+
+    --
+
+    note as RES_NOTE
+      RESERVED: средства удерживаются.
+      APPROVED не означает окончательное списание.
+      ROLLED_BACK: средства возвращены.
+
+      Повторный rollback вызывает RollbackAlreadySatisfiedException.
+    end note
+}
+
+CARD -[hidden]down-> TX
+TX -[hidden]down-> RES
+
+@enduml
