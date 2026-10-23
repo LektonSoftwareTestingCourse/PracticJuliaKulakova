@@ -1,0 +1,39 @@
+@startuml A1_C4_Context
+' A1. C4 Level 1 — Context. Границы СМП и внешние юзеры.
+' Источники:
+'  - docker-compose.yaml (порты, GATEWAY_URL/LOGGER_WS_URL)
+'  - services/gateway/src/main/resources/application.yml (маршруты /api/transactions, /api/cards, /api/simulator/*, /api/dashboard)
+'  - services/authorization/src/main/resources/application.yaml (bin-lookup.url)
+'  - services/dashboard (useWebSocket -> LOGGER_WS_URL)
+title A1. C4 Level 1 — Context. Границы СМП и внешние юзеры
+
+skinparam actorStyle awesome
+skinparam rectangle {
+  BackgroundColor #F5F7FA
+  BorderColor #2C3E50
+}
+
+actor "Оператор / аналитик\n(Web Dashboard)" as OPER
+actor "POS-терминал\n(Terminal Simulator :8085)" as TERM
+actor "Мерчант / эквайрер\n(Merchant+Acquirer Sim :8084)" as MERCH
+
+rectangle "СМП — Симулятор процессингового центра" as SMP #E8F4FF {
+  usecase "API Gateway :8080\nединая точка входа\n(REST / HTTP JSON)" as GW_ENTRY
+  usecase "Transaction Logger :8088\nпоток транзакций\n(WebSocket)" as WS_ENTRY
+}
+
+actor "Внешний BIN Lookup\n(эмулятор: bin-lookup :8096)" as BIN
+
+OPER  --> GW_ENTRY : "REST / HTTP+JSON\n(/api/dashboard/**, /api/cards/**)"
+OPER  ..> WS_ENTRY : "WebSocket ws://\n(real-time транзакции)"
+TERM  --> GW_ENTRY : "HTTP POST /api/transactions\n(платёжный запрос)"
+MERCH --> GW_ENTRY : "HTTP POST /api/transactions\n(/api/simulator/merchant/**)"
+SMP   ..> BIN      : "HTTP GET /api/bin/{bin}\n(вызывает Authorization)"
+
+note bottom of BIN
+  bin-lookup развёрнут в docker-compose (часть стенда),но играет роль внешней системы.
+  Хотя контейнер входит в стенд, логически он играет роль зависимости для Authorization.
+  При E2E его либо поднимают, либо подменяют.
+end note
+
+@enduml
