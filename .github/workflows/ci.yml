@@ -13,21 +13,21 @@ name: CI Pipeline
 on:
   push:
     branches:
-      - ''
+      - '**'
     paths-ignore:
-      - 'docs/'
-      - 'tz/'
-      - '/*.md'
-      - '/*.puml'
-      - '/*.png'
+      - 'docs/**'
+      - 'tz/**'
+      - '**/*.md'
+      - '**/*.puml'
+      - '**/*.png'
   pull_request:
     branches: [ main ]
     paths:
-      - 'services/'
+      - 'services/**'
       - '.github/workflows/ci.yml'
       - 'docker-compose.yaml'
       - '.env.example'
-      - 'docs/api/'
+      - 'docs/api/**'
       - 'scripts/smoke-test.sh'
       - 'scripts/smoke-test.ps1'
       - 'scripts/load-smoke.sh'
