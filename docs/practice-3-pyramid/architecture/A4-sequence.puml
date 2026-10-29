@@ -1,0 +1,155 @@
+
+@startuml a4-sequence
+
+title A4. Путь транзакции: Happy Path, Declined, Reversal
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam sequence {
+    ParticipantPadding 18
+}
+skinparam BoxPadding 10
+skinparam maxMessageSize 55
+
+skinparam sequence {
+    ArrowColor #6F6680
+    LifeLineBorderColor #B8AFC8
+    LifeLineBackgroundColor #FAF8FC
+    ParticipantBorderColor #B8AFC8
+    ParticipantBackgroundColor #E9DFF5
+    ParticipantFontColor #40364F
+    ActorBorderColor #B8AFC8
+    ActorBackgroundColor #DCE9F8
+    ActorFontColor #40364F
+    GroupBorderColor #C7B8D8
+    GroupBackgroundColor #F8F4FB
+    GroupHeaderFontColor #40364F
+}
+
+actor "Терминал /\nМерчант" as CL #DCE9F8
+participant "Gateway" as GW #DCE9F8
+participant "Switch" as SW #E9DFF5
+participant "Authorization" as AUTH #F4DDE5
+participant "Card Management" as CMS #E9DFF5
+participant "Bin Lookup" as BIN #DCE9F8
+participant "Merchant Acquirer" as MERCH #DCE9F8
+queue "RabbitMQ" as RMQ #DCE9F8
+participant "Transaction Logger" as LOG #E9DFF5
+participant "Notification Service" as NS #F4DDE5
+participant "Dashboard" as DWD #DCE9F8
+
+autonumber
+
+== 1. Happy Path — успешная транзакция ==
+
+CL -> GW : POST /api/transactions (MTI 0100)
+GW -> SW : POST /api/internal/route
+SW -> SW : Нормализация запроса\nОпределение issuerId по BIN
+SW -> AUTH : POST /api/internal/authorize
+
+AUTH -> BIN : GET /api/bin/{bin}
+BIN --> AUTH : issuerId
+
+AUTH -> CMS : GET /api/cards/{pan}
+CMS --> AUTH : Карта ACTIVE\nБаланс, лимиты, срок действия
+
+AUTH -> AUTH : Проверка статуса карты
+AUTH -> AUTH : Проверка срока действия
+AUTH -> AUTH : Проверка баланса и лимитов
+
+AUTH -> CMS : POST /api/cards/{pan}/reserve\n(amount, rrn)
+CMS -> CMS : Сохранение резерва\nОбновление баланса в БД
+CMS -> CMS : Сохранение события в outbox
+CMS --> AUTH : 200 OK
+
+AUTH -> AUTH : Генерация RRN и authCode
+AUTH --> SW : APPROVED, code 00, rrn
+
+SW -> MERCH : Получение комиссии эквайринга
+MERCH --> SW : Fee
+
+SW -> RMQ : Публикация transaction.log
+
+SW --> GW : TransactionResponse: APPROVED
+GW --> CL : HTTP 200: APPROVED, code 00
+
+... Асинхронная обработка после ответа клиенту ...
+
+RMQ ->> LOG : transaction-log
+LOG -> LOG : Сохранение транзакции в БД
+LOG ->> DWD : WebSocket: обновление данных
+
+CMS -> RMQ : Публикация события карты из outbox
+RMQ ->> NS : card notification event
+NS -> NS : Сохранение уведомления в БД
+
+== 2. Declined — заблокированная карта ==
+
+CL -> GW : POST /api/transactions
+GW -> SW : POST /api/internal/route
+SW -> AUTH : POST /api/internal/authorize
+
+AUTH -> CMS : GET /api/cards/{pan}
+
+alt Карта имеет статус BLOCKED
+    CMS --> AUTH : Карта BLOCKED
+else Card Management возвращает ошибку
+    CMS --> AUTH : 402 Payment Required
+end
+
+AUTH -> AUTH : Проверка статуса карты\nРезультат: CARD_BLOCKED
+AUTH --> SW : DECLINED, code 05,\nCARD_BLOCKED
+
+SW -> MERCH : Получение комиссии эквайринга
+MERCH --> SW : Fee
+
+SW -> RMQ : Публикация transaction.log\n(status DECLINED)
+SW --> GW : TransactionResponse: DECLINED
+GW --> CL : HTTP 200: DECLINED, code 05
+
+... Асинхронное логирование отказа ...
+
+RMQ ->> LOG : transaction-log (DECLINED)
+LOG -> LOG : Сохранение отказанной\nтранзакции в БД
+
+== 3. Reversal — ошибка публикации и возврат средств ==
+
+CL -> GW : POST /api/transactions (MTI 0100)
+GW -> SW : POST /api/internal/route
+SW -> AUTH : POST /api/internal/authorize
+
+AUTH -> CMS : GET /api/cards/{pan}
+CMS --> AUTH : Карта ACTIVE
+
+AUTH -> AUTH : Проверка срока, баланса и лимитов
+AUTH -> CMS : POST /api/cards/{pan}/reserve\n(amount, rrn)
+CMS -> CMS : Резервирование средств
+CMS --> AUTH : 200 OK
+
+AUTH --> SW : APPROVED, code 00, rrn
+
+SW -> MERCH : Получение комиссии эквайринга
+MERCH --> SW : Fee
+
+SW -> RMQ : Публикация transaction.log
+
+SW -> SW : LoggerClient.log() ловит AmqpException\nи возвращает false
+
+SW -> SW : tryLog() == false\nи статус == APPROVED
+
+SW -> AUTH : POST /api/internal/rollback\n(rrn, pan, amount)
+AUTH -> CMS : POST /api/cards/{pan}/rollback
+
+CMS -> CMS : Пометка резерва ROLLED_BACK\nВозврат средств в БД
+CMS --> AUTH : 200 OK
+
+AUTH --> SW : RollbackResponse: APPROVED
+SW -> SW : Формирование системного отказа\nResponse code 96
+
+SW --> GW : TransactionResponse: DECLINED,\ncode 96
+GW --> CL : HTTP 200: DECLINED, code 96
+
+@enduml

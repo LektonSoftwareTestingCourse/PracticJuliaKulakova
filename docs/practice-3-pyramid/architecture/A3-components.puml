@@ -1,0 +1,167 @@
+
+@startuml A3_Components_PaymentServices
+
+title A3. C4 Level 3 — Authorization & Card Management
+
+left to right direction
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam nodesep 45
+skinparam ranksep 70
+skinparam linetype ortho
+skinparam ArrowThickness 1.2
+skinparam Padding 10
+skinparam ArrowFontSize 10
+
+skinparam packageStyle rectangle
+skinparam packageBorderColor #888888
+skinparam databaseBorderColor #777777
+skinparam queueBorderColor #777777
+
+skinparam legend {
+  BackgroundColor #FAFBFC
+  BorderColor #C5CDD3
+}
+
+
+actor "Switch" as SW
+
+package "Authorization Service" #F4DDE5 {
+
+  component "AuthControllerImpl\n/authorize, /rollback" as AUTH_CTRL #F4DDE5
+
+  component "AuthService\n<<interface>>" as AUTH_IF #F4DDE5
+
+  component "AuthServiceImpl\n@Transactional\nстатус, expiry, лимиты,\nбаланс, RRN/authCode,\nоткат" as AUTH_SVC #F4DDE5
+
+  component "CardManagementClient\n<<interface>>" as CM_IF #F4DDE5
+
+  component "CardManagementClientImpl\nRestClient + маппинг\nHTTP-ошибок" as CM_CLIENT #F4DDE5
+
+  component "BinLookupClient\nRestClient,\ngraceful degradation" as BIN_CLIENT #F4DDE5
+
+  component "LimitUsageRepository\nJdbcTemplate, upsert лимитов,\nRRN-блок" as LIMIT_REPO #F4DDE5
+
+  component "AuthorizationEventNotifierImpl\n+ AuthorizationLogEventListenerImpl" as AUTH_EVT #F4DDE5
+
+  component "HealthControllerImpl /\nHealthServiceImpl" as AUTH_HEALTH #F4DDE5
+
+  component "CleanupServiceImpl" as AUTH_CLEAN #F4DDE5
+}
+
+package "Card Management Service" #E9DFF5 {
+
+  component "CardController\n/api/cards" as CARD_CTRL #E9DFF5
+
+  component "CardGeneratorController\n/api/cards/generate" as GEN_CTRL #E9DFF5
+
+  component "BinIssuerController" as BIN_CTRL #E9DFF5
+
+  component "CardService\n<<interface>>" as CARD_IF #E9DFF5
+
+  component "CardServiceImpl\ncreate/patch/delete,\nreserve, rollback" as CARD_SVC #E9DFF5
+
+  component "PanGenerator /\nLuhnValidator" as PAN #E9DFF5
+
+  component "BinIssuerServiceImpl" as BIN_ISSUER #E9DFF5
+
+  component "CardGeneratorService" as CARD_GEN #E9DFF5
+
+  component "RetryService /\nTransactionRunner" as RETRY #E9DFF5
+
+  component "CardEventNotifierImpl\n+ CardServiceLogEventListener" as CARD_EVT #E9DFF5
+
+  component "OutboxEventProcessorImpl\nRabbitTemplate publisher" as OUTBOX #E9DFF5
+
+  component "OutboxProcessor\nscheduler, interval=1000ms" as OUTBOX_SCHED #E9DFF5
+
+  component "CardRepository (JPA)" as CARD_REPO #E9DFF5
+
+  component "ReservationRepository (JPA)" as RES_REPO #E9DFF5
+
+  component "ReservationRollbackRepository (JPA)" as RB_REPO #E9DFF5
+
+  component "BinIssuerRepository (JPA)" as BIN_REPO #E9DFF5
+
+  component "OutboxRepository (JPA)" as OUTBOX_REPO #E9DFF5
+}
+
+package "Внешние сервисы и инфраструктура" #DCE9F8 {
+
+  component "Bin Lookup\n(external service)" as BIN_EXT #DCE9F8
+
+  database "PostgreSQL" as DB #DCE9F8
+
+  queue "RabbitMQ\nsmp.card-events" as RMQ #DCE9F8
+}
+
+SW --> AUTH_CTRL : HTTP
+
+AUTH_CTRL --> AUTH_IF
+AUTH_IF <|.. AUTH_SVC
+
+AUTH_SVC --> CM_IF
+CM_IF <|.. CM_CLIENT
+
+AUTH_SVC --> BIN_CLIENT : getIssuerId(pan)
+AUTH_SVC --> LIMIT_REPO : repository call
+AUTH_SVC --> AUTH_EVT : notify(...)
+
+CM_CLIENT --> CARD_CTRL : HTTP
+BIN_CLIENT --> BIN_EXT : HTTP
+
+CARD_CTRL --> CARD_IF
+CARD_IF <|.. CARD_SVC
+
+CARD_SVC --> PAN
+CARD_SVC --> BIN_ISSUER
+CARD_SVC --> RETRY
+
+CARD_SVC --> CARD_REPO : repository call
+CARD_SVC --> RES_REPO : repository call
+CARD_SVC --> RB_REPO : repository call
+
+GEN_CTRL --> CARD_GEN
+CARD_GEN --> PAN
+
+BIN_CTRL --> BIN_REPO
+CARD_SVC --> CARD_EVT : notifyListeners(event)
+
+CARD_EVT --> OUTBOX : save event\nin same transaction
+
+OUTBOX_SCHED --> OUTBOX : scheduled processing
+OUTBOX --> OUTBOX_REPO : repository call
+OUTBOX_REPO --> DB : outbox_events
+
+OUTBOX ..> RMQ : AMQP publish\nrk=card.<Event>
+LIMIT_REPO --> DB : JDBC / native SQL
+
+CARD_REPO --> DB : JPA
+RES_REPO --> DB : JPA
+RB_REPO --> DB : JPA
+BIN_REPO --> DB : JPA
+
+note right of AUTH_HEALTH
+  Отдельный health endpoint.
+  Не вызывается из AuthController.
+end note
+
+note right of AUTH_CLEAN
+  Фоновая очистка.
+  Не вызывается из AuthController.
+end note
+
+legend bottom
+  |= Цвет |= Область |
+  |<#F4DDE5> | Authorization Service |
+  |<#E9DFF5> | Card Management Service |
+  |<#DCE9F8> | Внешние сервисы и инфраструктура |
+
+  -->  Синхронный вызов / зависимость
+  ..>  Асинхронная публикация события
+endlegend
+
+@enduml

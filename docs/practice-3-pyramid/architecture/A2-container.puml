@@ -1,0 +1,139 @@
+
+@startuml A2_C4_Container
+
+title A2. C4 Level 2 — Контейнеры СМП и синхронные / асинхронные связи
+
+left to right direction
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ArrowThickness 1.2
+skinparam linetype ortho
+skinparam nodesep 65
+skinparam ranksep 50
+skinparam Padding 12
+skinparam packageStyle rectangle
+skinparam ArrowFontSize 10
+
+skinparam package {
+  BorderColor #B8C4CC
+  FontColor #34495E
+  BackgroundColor #FAFBFC
+}
+
+skinparam legend {
+  BackgroundColor #FAFBFC
+  BorderColor #C5CDD3
+}
+
+skinparam ArrowColor #64748B
+skinparam ArrowFontColor #475569
+skinparam ArrowFontSize 10
+
+skinparam component {
+  BorderColor #84919C
+  FontColor #344054
+}
+
+skinparam database {
+  BorderColor #83A5CC
+  FontColor #344054
+}
+
+skinparam queue {
+  BorderColor #83A5CC
+  FontColor #344054
+}
+
+rectangle "Terminal Simulator\n:8085" as TERM #F6DFC5
+rectangle "Merchant / Acquirer Sim\n:8084" as MERCH #F6DFC5
+rectangle "BIN Lookup\n:8096" as BIN #F6DFC5
+rectangle "Web Dashboard\nReact :3000" as DASH #DCEEDC
+rectangle "Gateway\nSpring Cloud Gateway :8080" as GW #DCEEDC
+rectangle "Switch (Router)\n:8082" as SW #F4DDE5
+rectangle "Authorization\n:8083" as AUTH #F4DDE5
+rectangle "Card Management\n:8081" as CMS #F4DDE5
+rectangle "Transaction Logger\n:8088" as LOG #E9DFF5
+rectangle "Notification Service\n:8097" as NS #E9DFF5
+queue "RabbitMQ\n:5672 AMQP\n:15672 Management" as RMQ #DCE9F8
+database "PostgreSQL\n:5432" as DB #DCE9F8
+
+TERM -[hidden]down-> MERCH
+MERCH -[hidden]down-> BIN
+
+DASH -[hidden]down-> GW
+
+SW -[hidden]down-> AUTH
+AUTH -[hidden]down-> CMS
+
+LOG -[hidden]down-> NS
+
+RMQ -[hidden]down-> DB
+
+TERM --> GW : HTTP POST\n/api/transactions
+
+MERCH --> GW : HTTP\n/api/simulator/merchant/**
+
+DASH --> GW : HTTP\n/api/dashboard/**, /api/cards/**
+
+GW --> SW : HTTP POST\nRewritePath:\n/api/transactions ->\n/api/internal/route
+
+GW --> LOG : HTTP GET\n/api/transactions/**,\n/api/dashboard/**
+
+GW --> CMS : HTTP\n/api/cards/**
+
+GW --> TERM : HTTP\n/api/simulator/terminal/**
+
+GW --> MERCH : HTTP\n/api/simulator/merchant/**
+
+SW --> AUTH : HTTP POST\n/api/internal/authorize
+
+SW --> MERCH : HTTP\n(AcquiringFeeClient)
+
+AUTH --> CMS : HTTP GET /api/cards/{pan}\nPOST /reserve, POST /rollback
+
+AUTH --> BIN : HTTP GET\n/api/bin/{bin} (issuerId)
+
+SW ..> RMQ : AMQP publish\nsmp.transactions\nrk=transaction.log
+
+RMQ ..> LOG : AMQP consume\ntransaction-log
+
+CMS ..> RMQ : AMQP publish (outbox)\nsmp.card-events\nrk=card.*
+
+RMQ ..> NS : AMQP consume\ncard-notifications
+
+LOG -[#8B779F,dashed]-> DASH : WebSocket push\n/ws/transactions
+
+AUTH --> DB : JDBC\n(limit_usage)
+
+CMS --> DB : JDBC\n(cards, reservations, outbox)
+
+LOG --> DB : JDBC\n(transactions)
+
+NS --> DB : JDBC\n(notifications)
+
+MERCH --> DB : JDBC\n(merchants, terminals, fees)
+
+note bottom of TERM
+  Terminal Simulator обращается к Card Management напрямую,
+  минуя Gateway, чтобы получать тестовые карты.
+end note
+
+legend right
+  |= Тип связи |= Значение |
+  | Сплошная стрелка --> | Синхронный HTTP / JDBC |
+  | Пунктирная стрелка ..> | Асинхронный AMQP |
+  | <color:#8B779F>Штриховая стрелка</color> | WebSocket |
+
+  == Цвета компонентов ==
+
+  | <back:#F6DFC5>     </back> | Внешние системы |
+  | <back:#DCEEDC>     </back> | Входной уровень |
+  | <back:#F4DDE5>     </back> | Ядро процессинга |
+  | <back:#E9DFF5>     </back> | Вспомогательные сервисы |
+  | <back:#DCE9F8>     </back> | Инфраструктура |
+endlegend
+
+@enduml

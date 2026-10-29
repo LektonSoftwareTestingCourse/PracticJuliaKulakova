@@ -1,0 +1,97 @@
+
+@startuml A5_RabbitMQ_Topology
+
+title A5. Асинхронный обмен сообщениями
+
+top to bottom direction
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ArrowThickness 1.3
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+skinparam nodesep 25
+skinparam ranksep 30
+
+!define PINK #F4DDE5
+!define LAVENDER #E9DFF5
+!define BLUE #DCE9F8
+!define YELLOW #FFF8E7
+!define GREY #F2F0F5
+skinparam legend {
+  BackgroundColor #FAFBFC
+  BorderColor #C5CDD3
+}
+
+
+rectangle "Switch\nLoggerClient" as SW LAVENDER
+rectangle "Card Management\nOutbox Processor" as CMS LAVENDER
+
+package "RabbitMQ" #F8F6FB {
+
+    package "Поток транзакций" #F0EBF8 {
+        rectangle "smp.transactions\nTopic Exchange" as TX_EX YELLOW
+        queue "transaction-log" as TX_Q BLUE
+        rectangle "smp.transactions.dlx\nDirect Exchange" as TX_DLX YELLOW
+        queue "transaction-log-dlq" as TX_DLQ GREY
+
+        TX_EX -down-> TX_Q : transaction.log
+        TX_Q -down-> TX_DLX : dead letter
+        TX_DLX -down-> TX_DLQ : routing
+    }
+
+    package "Поток событий карт" #FCEFF3 {
+        rectangle "smp.card-events\nTopic Exchange" as CARD_EX YELLOW
+        queue "card-notifications" as CARD_Q BLUE
+        rectangle "smp.card-events.dlx\nDirect Exchange" as CARD_DLX YELLOW
+        queue "card-notifications-dlq" as CARD_DLQ GREY
+
+        CARD_EX -down-> CARD_Q : card.*
+        CARD_Q -down-> CARD_DLX : dead letter
+        CARD_DLX -down-> CARD_DLQ : routing
+    }
+}
+
+rectangle "Transaction Logger\nсохранение транзакции" as LOG PINK
+rectangle "Notification Service\nобработка событий" as NS PINK
+
+SW -down-> TX_EX : publish transaction.log
+
+' Transaction Logger слева от очереди
+LOG -[hidden]right-> TX_Q
+TX_Q -left..> LOG : consume
+
+CMS -down-> CARD_EX : publish card event
+
+' Notification Service справа от очереди
+CARD_Q -right..> NS : consume
+CARD_Q -[hidden]right-> NS
+
+note left of SW
+  При AmqpException
+  Switch запускает rollback
+  и возвращает code 96.
+  Confirm не ожидается.
+end note
+
+note right of CMS
+  Outbox Processor:
+  интервал 1 с,
+  максимум 3 попытки.
+end note
+
+legend bottom
+  |= Цвет |= Роль |
+  | <back:#E9DFF5>   </back> | Основные компоненты |
+  | <back:#F4DDE5>   </back> | Обработчики сообщений |
+  | <back:#DCE9F8>   </back> | Очереди |
+  | <back:#FFF8E7>   </back> | Exchange |
+  | <back:#F2F0F5>   </back> | DLQ |
+
+  DLQ предназначены для диагностики.
+  x-max-delivery=3 задан, но работа лимита не подтверждена.
+endlegend
+
+@enduml
