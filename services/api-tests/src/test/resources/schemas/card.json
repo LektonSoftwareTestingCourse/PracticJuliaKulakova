@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Card",
+  "description": "Контракт карты: docs/api-spec.md, модель Card",
+  "type": "object",
+  "required": ["id", "pan", "bin", "cardholderName", "expiryDate", "status",
+    "currencyCode", "dailyLimit", "monthlyLimit", "availableBalance", "issuerId", "createdAt"],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "pan": {
+      "type": "string",
+      "pattern": "^\\d{16}$"
+    },
+    "bin": {
+      "type": "string",
+      "pattern": "^\\d{6}$"
+    },
+    "cardholderName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expiryDate": {
+      "type": "string"
+    },
+    "status": {
+      "enum": ["ACTIVE", "INACTIVE", "BLOCKED", "EXPIRED", "DELETED"]
+    },
+    "currencyCode": {
+      "type": "string",
+      "pattern": "^\\d{3}$"
+    },
+    "dailyLimit": {
+      "type": "number"
+    },
+    "monthlyLimit": {
+      "type": "number"
+    },
+    "availableBalance": {
+      "type": "number"
+    },
+    "issuerId": {
+      "type": ["string", "null"]
+    },
+    "createdAt": {
+      "type": "string"
+    }
+  }
+}

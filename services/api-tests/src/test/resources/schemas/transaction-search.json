@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TransactionSearchResponse",
+  "description": "Контракт поиска транзакций: docs/api-spec.md, GET /api/transactions/search",
+  "type": "object",
+  "required": ["total", "transactions"],
+  "properties": {
+    "total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "transactions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/transaction"
+      }
+    }
+  },
+  "definitions": {
+    "transaction": {
+      "type": "object",
+      "required": ["id", "mti", "stan", "pan", "amount", "currencyCode", "status",
+        "transmissionDateTime", "createdAt"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "mti": {
+          "type": "string"
+        },
+        "stan": {
+          "type": "string",
+          "pattern": "^\\d{6}$"
+        },
+        "rrn": {
+          "type": ["string", "null"]
+        },
+        "pan": {
+          "type": "string"
+        },
+        "processingCode": {
+          "type": ["string", "null"]
+        },
+        "amount": {
+          "type": "number"
+        },
+        "currencyCode": {
+          "type": "string"
+        },
+        "terminalId": {
+          "type": ["string", "null"]
+        },
+        "terminalType": {
+          "type": ["string", "null"]
+        },
+        "merchantId": {
+          "type": ["string", "null"]
+        },
+        "mcc": {
+          "type": ["string", "null"]
+        },
+        "acquirerId": {
+          "type": ["string", "null"]
+        },
+        "issuerId": {
+          "type": ["string", "null"]
+        },
+        "acquiringFee": {
+          "type": ["number", "null"]
+        },
+        "status": {
+          "enum": ["APPROVED", "DECLINED"]
+        },
+        "declineReason": {
+          "type": ["string", "null"]
+        },
+        "authCode": {
+          "type": ["string", "null"]
+        },
+        "processingTimeMs": {
+          "type": ["integer", "null"]
+        },
+        "transmissionDateTime": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
