@@ -100,6 +100,85 @@ jobs:
       if: always()
       run: docker compose down -v
 
+  api-tests:
+    if: github.event.inputs.practice == '5'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Normalize GHCR namespace to lowercase
+      run: echo "GHCR_USER=${OWNER,,}" >> "$GITHUB_ENV"
+      env:
+        OWNER: ${{ github.repository_owner }}
+
+    - name: Set up JDK 21 for API tests
+      uses: actions/setup-java@v5
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: Create .env file
+      run: cp .env.example .env
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Cache Maven/npm build mounts
+      uses: actions/cache@v4
+      with:
+        path: |
+          var-cache-m2
+          var-cache-npm
+        key: docker-build-mounts-${{ hashFiles('services/**/pom.xml', 'services/dashboard/package.json') }}
+        restore-keys: |
+          docker-build-mounts-
+
+    - name: Inject build mounts into Buildx
+      uses: reproducible-containers/buildkit-cache-dance@v3.1.2
+      with:
+        cache-map: |
+          {
+            "var-cache-m2": "/root/.m2",
+            "var-cache-npm": "/root/.npm"
+          }
+        skip-extraction: false
+
+    - name: Build Docker images
+      run: docker compose build
+      env:
+        GHCR_USER: ${{ env.GHCR_USER }}
+
+    - name: Start all services
+      run: docker compose up -d
+      env:
+        GHCR_USER: ${{ env.GHCR_USER }}
+
+    - name: Wait for services to be ready
+      run: |
+        echo "Waiting for services to start"
+        for i in {1..60}; do
+          not_ready=$(docker compose ps --format '{{.Health}}' | grep -E 'starting|unhealthy' | wc -l | tr -d ' ')
+          if [ "$not_ready" == "0" ]; then
+            break
+          fi
+          echo "Waiting ($i/60)"
+          sleep 5
+        done
+        sleep 15
+
+    - name: Run API tests (practice 5)
+      run: mvn -f services/pom.xml -P api-tests test
+
+    - name: Show logs on failure
+      if: failure()
+      run: docker compose logs --tail=100
+
+    - name: Cleanup
+      if: always()
+      run: docker compose down -v
+
   e2e-tests:
     if: github.event.inputs.practice == '5'
     runs-on: ubuntu-latest
