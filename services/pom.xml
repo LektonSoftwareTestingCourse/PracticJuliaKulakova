@@ -35,6 +35,7 @@
         <skipE2eTests>true</skipE2eTests>
         <!-- API-тесты (практика 5) требуют поднятого стека; включаются через -Papi-tests -->
         <skipApiTests>true</skipApiTests>
+        <skipITs>true</skipITs>
     </properties>
 
 
@@ -59,6 +60,22 @@
                 <module>e2e-tests</module>
                 <module>api-tests</module>
             </modules>
+        </profile>
+
+
+        <profile>
+            <id>integration-tests</id>
+            <modules>
+                <module>common</module>
+                <module>card-management</module>
+                <module>authorization</module>
+                <module>transaction-logger</module>
+                <module>switch</module>
+                <module>integration-tests</module>
+            </modules>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
         </profile>
 
 
@@ -238,6 +255,26 @@
                         <failOnViolation>true</failOnViolation>
                         <violationSeverity>warning</violationSeverity>
                     </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <configuration>
+                        <skipITs>${skipITs}</skipITs>
+                        <includes>
+                            <include>**/*IT.java</include>
+                        </includes>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>integration-tests</id>
+                            <phase>integration-test</phase>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
