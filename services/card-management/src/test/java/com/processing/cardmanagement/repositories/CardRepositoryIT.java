@@ -158,9 +158,9 @@ class CardRepositoryIT {
     }
 
     private static String uniquePan() {
-        long tail = System.nanoTime() % 100_000_000_000L;
-        String body = "400000" + String.format("%010d", tail + SEQUENCE.incrementAndGet());
-        return body + luhnCheckDigit(body.substring(0, 15));
+        long seq = SEQUENCE.incrementAndGet();
+        String body = "400000" + String.format("%09d", seq % 1_000_000_000L);
+        return body + luhnCheckDigit(body);
     }
 
     private static int luhnCheckDigit(String digits15) {
