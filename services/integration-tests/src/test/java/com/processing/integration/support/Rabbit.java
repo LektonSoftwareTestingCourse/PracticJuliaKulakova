@@ -1,6 +1,7 @@
 package com.processing.integration.support;
 
 import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.AlreadyClosedException;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
@@ -43,7 +44,7 @@ public final class Rabbit {
         withChannel(host, port, username, password, channel -> {
             channel.exchangeDeclare(DLX_EXCHANGE, "direct", true);
             channel.queueDeclare(DLQ, true, false, false,
-                Map.of("x-message-ttl", DLQ_TTL_MS));
+                    Map.of("x-message-ttl", DLQ_TTL_MS));
             channel.queueBind(DLQ, DLX_EXCHANGE, DLQ_ROUTING_KEY);
         });
     }
@@ -51,16 +52,16 @@ public final class Rabbit {
     public static void awaitQueueDeclared(
             String host, int port, String username, String password, Duration timeout) {
         await()
-            .atMost(timeout)
-            .pollInterval(Duration.ofMillis(250))
-            .until(() -> isQueueDeclared(host, port, username, password));
+                .atMost(timeout)
+                .pollInterval(Duration.ofMillis(250))
+                .until(() -> isQueueDeclared(host, port, username, password));
     }
 
     private static boolean isQueueDeclared(
             String host, int port, String username, String password) {
         try {
             withChannel(host, port, username, password, channel ->
-                channel.queueDeclarePassive(QUEUE));
+                    channel.queueDeclarePassive(QUEUE));
             return true;
         } catch (RuntimeException notDeclaredYet) {
             return false;
@@ -70,30 +71,30 @@ public final class Rabbit {
     public static void publishRaw(
             String host, int port, String username, String password, byte[] body) {
         withChannel(host, port, username, password, channel -> channel.basicPublish(
-            EXCHANGE, ROUTING_KEY,
-            new AMQP.BasicProperties.Builder()
-                .contentType("application/json")
-                .deliveryMode(2)
-                .build(),
-            body));
+                EXCHANGE, ROUTING_KEY,
+                new AMQP.BasicProperties.Builder()
+                        .contentType("application/json")
+                        .deliveryMode(2)
+                        .build(),
+                body));
     }
 
     public static void publishJavaSerialized(
             String host, int port, String username, String password, Object payload) {
         byte[] body = serialize(payload);
         withChannel(host, port, username, password, channel -> channel.basicPublish(
-            EXCHANGE, ROUTING_KEY,
-            new AMQP.BasicProperties.Builder()
-                .contentType("application/x-java-serialized-object")
-                .deliveryMode(2)
-                .build(),
-            body));
+                EXCHANGE, ROUTING_KEY,
+                new AMQP.BasicProperties.Builder()
+                        .contentType("application/x-java-serialized-object")
+                        .deliveryMode(2)
+                        .build(),
+                body));
     }
 
     public static int depth(String host, int port, String username, String password, String queue) {
         int[] depth = new int[1];
         withChannel(host, port, username, password, channel ->
-            depth[0] = channel.queueDeclarePassive(queue).getMessageCount());
+                depth[0] = channel.queueDeclarePassive(queue).getMessageCount());
         return depth[0];
     }
 
@@ -147,11 +148,28 @@ public final class Rabbit {
         factory.setPort(port);
         factory.setUsername(username);
         factory.setPassword(password);
-        try (Connection connection = factory.newConnection();
-             Channel channel = connection.createChannel()) {
+
+        Connection connection = null;
+        Channel channel = null;
+        try {
+            connection = factory.newConnection();
+            channel = connection.createChannel();
             action.run(channel);
         } catch (IOException | TimeoutException e) {
             throw new IllegalStateException("Ошибка работы с RabbitMQ", e);
+        } finally {
+            if (channel != null && channel.isOpen()) {
+                try {
+                    channel.close();
+                } catch (IOException | AlreadyClosedException e) {
+                }
+            }
+            if (connection != null && connection.isOpen()) {
+                try {
+                    connection.close();
+                } catch (IOException e) {
+                }
+            }
         }
     }
 
