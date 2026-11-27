@@ -77,7 +77,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       - name: Run java linter
-        run: mvn -f services/pom.xml -P${{ matrix.service }} checkstyle:check
+        run: mvn $MAVEN_ARGS -f services/pom.xml -P${{ matrix.service }} checkstyle:check
       # verify запускает unit-тесты, JaCoCo-отчёты и Quality Gate (switch: branch >= 70%)
       - name: Build and test services
         run: mvn -f services/pom.xml -P${{ matrix.service }} verify -Dcheckstyle.skip=true
