@@ -161,7 +161,7 @@ public final class Rabbit {
             if (channel != null && channel.isOpen()) {
                 try {
                     channel.close();
-                } catch (IOException | AlreadyClosedException e) {
+                } catch (IOException | TimeoutException | AlreadyClosedException e) {
                 }
             }
             if (connection != null && connection.isOpen()) {
