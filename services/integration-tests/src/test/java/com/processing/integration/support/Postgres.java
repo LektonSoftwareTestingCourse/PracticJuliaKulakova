@@ -27,7 +27,7 @@ public final class Postgres {
 
     public static void createServiceDatabases(PostgreSQLContainer<?> container) {
         for (String database : List.of(CARD_MANAGEMENT_DB, AUTHORIZATION_DB, TRANSACTION_LOGGER_DB)) {
-            executeOnAdmin(container, "CREATE DATABASE " + database);
+            executeOnAdmin(container, "CREATE DATABASE \"" + database + "\"");
         }
     }
 
