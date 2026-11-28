@@ -31,10 +31,12 @@
         <checkstyle.version>3.4.0</checkstyle.version>
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <jacoco.version>0.8.12</jacoco.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
         <!-- E2E require docker compose; enabled via -Pe2e-tests -->
         <skipE2eTests>true</skipE2eTests>
         <!-- API-тесты (практика 5) требуют поднятого стека; включаются через -Papi-tests -->
         <skipApiTests>true</skipApiTests>
+        <skipITs>true</skipITs>
     </properties>
 
 
@@ -59,6 +61,22 @@
                 <module>e2e-tests</module>
                 <module>api-tests</module>
             </modules>
+        </profile>
+
+
+        <profile>
+            <id>integration-tests</id>
+            <modules>
+                <module>common</module>
+                <module>card-management</module>
+                <module>authorization</module>
+                <module>transaction-logger</module>
+                <module>switch</module>
+                <module>integration-tests</module>
+            </modules>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
         </profile>
 
 
@@ -238,6 +256,26 @@
                         <failOnViolation>true</failOnViolation>
                         <violationSeverity>warning</violationSeverity>
                     </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <configuration>
+                        <skipITs>${skipITs}</skipITs>
+                        <includes>
+                            <include>**/*IT.java</include>
+                        </includes>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>integration-tests</id>
+                            <phase>integration-test</phase>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

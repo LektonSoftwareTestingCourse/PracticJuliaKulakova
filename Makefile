@@ -83,6 +83,9 @@ lint: mvn-lint npm-lint
 mvn-all:
 	$(MVN) package
 
+mvn-it:
+	$(MVN) -Pintegration-tests verify -Dcheckstyle.skip=true
+
 mvn-clean:
 	$(MVN) clean
 
